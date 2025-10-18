@@ -1,72 +1,94 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:movie_browsing_app/screens/settings_screen.dart';
-import '../theme_management/theme_enum.dart';
+import 'package:movie_browsing_app/screens/favourite_screen.dart';
+import 'package:movie_browsing_app/services/api_services.dart';
+import '../models/movie.dart';
+import '../services/favourites_service.dart';
 import '../widgets/movie_card.dart';
 import 'search_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  final ValueChanged<ThemeOption> onThemeChange;
-  final ThemeOption currentTheme;
-
-  const HomeScreen({
-    required this.onThemeChange,
-    required this.currentTheme,
-    super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+
+
+  Widget buildSection(String title, Future<List<Movie>> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.all(8),
+          child: Text(title,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        ),
+        SizedBox(
+          height: 250,
+          child: FutureBuilder<List<Movie>>(
+            future: items,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              final movies = (snapshot.data ?? []).where((movie) {
+                final p = movie.poster;
+                return p.isNotEmpty && p != "N/A" && p.startsWith("http");
+              }).toList();
+              if (movies.isEmpty) {
+                return const Center(child: Text('No movies found'));
+              }
+              return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: movies.length,
+                  itemBuilder: (context, index) {
+                    final movie = movies[index];
+                    return MovieCard(
+                        title: movie.title, movie: movie,);
+                  });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+  @override
   Widget build(BuildContext context) {
-    final topIndianMovies = ['Movie A', 'Movie B', 'Movie C'];
-    final popularShows = ['Show 1', 'Show 2', 'Show 3'];
-    final globalPopularMovies = ['Global 1', 'Global 2', 'Global 3'];
+    ApiService apiService = ApiService();
+    final topIndianMovies = apiService.fetchTopIndianMovies();
+    final popularShows = apiService.fetchPopularShows();
+    final globalPopularMovies =apiService.fetchGlobalPopularMovies() ;
 
-    Widget buildSection(String title, List<String> items) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(8),
-            child:
-            Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold , color: Theme.of(context).textTheme.bodyLarge?.color, ),),
-          ),
-          SizedBox(
-            height: 150,
-            child: ListView.separated(
-
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => SizedBox(width: 10),
-              itemBuilder: (_, index) => MovieCard(title: items[index]),
-            ),
-          ),
-        ],
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Home'),
-
         actions: [
+          IconButton(
+            icon: Icon(Icons.book_outlined),
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) =>FavouritesScreen()));
+            },
+          ),
+
           IconButton(
             icon: Icon(Icons.search),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => SearchScreen()));
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => SearchScreen()));
             },
           ),
           IconButton(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.logout),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(
-                    // Passed the required theme control callbacks and state
-                    onThemeChange: onThemeChange,
-                    currentTheme: currentTheme,
-                  ),
-                ),
-              );
+              FirebaseAuth.instance.signOut();
             },
           ),
         ],
@@ -80,4 +102,7 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+
 }
+
+
